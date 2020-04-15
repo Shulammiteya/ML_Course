@@ -42,26 +42,25 @@ def ml_loop():
         elif (VectorX < 0 and VectorY < 0):
             return 3
 
-    def get_point(ball_x, ball_y, direction_x):
-        if (direction_x == 0):
+    def get_point(ball_x, ball_y, dir, dir_x_abs):
+        if (dir_x_abs == 0):
             return scene_info.platform[0]
-        direction = direction_x
-        if (direction_x < 0):
-            direction_x = -direction_x
-
+        crush = -1
         while (ball_y < 400):
-            ball_x = ball_x + direction
-            ball_y = ball_y + direction_x
+            ball_x = ball_x + dir
+            ball_y = ball_y + dir_x_abs
             if (ball_x < 0):
                 ball_x = 0
-                direction = -direction
+                dir = -dir
+                crush = crush * -1
             elif (ball_x > 200):
                 ball_x =200
-                direction = -direction
+                dir = -dir
+                crush = crush * -1
         while (ball_y > 400):
-            ball_x = ball_x - direction/direction_x
+            ball_x = ball_x - dir/dir_x_abs
             ball_y = ball_y - 1
-        return ball_x
+        return ball_x * crush
 
     # 2. Inform the game process that ml process is ready before start the loop.
     comm.ml_ready()
@@ -75,7 +74,8 @@ def ml_loop():
         feature.append(scene_info.ball[1])
         feature.append(scene_info.platform[0])
         
-        direction_x = feature[0] - s[0]
+        dir = feature[0] - s[0]
+        dir_x_abs = abs(dir)
         direction = get_direction(feature[0],feature[1],s[0],s[1])
         feature.append(direction)
         s = [feature[0], feature[1]]
@@ -101,29 +101,47 @@ def ml_loop():
             ball_served = True
         else:
                 
-            y = clf.predict(feature)
+            """y = clf.predict(feature)
             
             if y == 0:
                 instruction = 'NONE'
             elif y == 1:
                 instruction = 'LEFT'
             elif y == 2:
-                instruction = 'RIGHT'
-
-            if (scene_info.ball[1] > 200 and (direction == 0 or direction == 2)):
-                point =  get_point(scene_info.ball[0], scene_info.ball[1], direction_x)
-                if (point - scene_info.platform[0] > 25):
+                instruction = 'RIGHT'"""
+            
+            instruction = 'NONE'
+            if (scene_info.ball[1] > 255):#and (direction == 0 or direction == 2)):
+                point =  get_point(scene_info.ball[0], scene_info.ball[1], dir, dir_x_abs)
+                if (point < 0):
+                    point = -point
+                elif (direction == 0):
+                    direction = 2
+                else:
+                    direction = 0
+                if (direction == 0):
+                    if (point - scene_info.platform[0] > 39):
+                        instruction = 'RIGHT'
+                    elif (point - scene_info.platform[0] < 28):
+                        instruction = 'LEFT'
+                else:
+                    if (point - scene_info.platform[0] < 1):
+                        instruction = 'LEFT'
+                    elif (point - scene_info.platform[0] > 12):
+                        instruction = 'RIGHT'
+            elif (scene_info.ball[1] > 200 ):#and (direction == 0 or direction == 2)):
+                if (scene_info.platform[0] < 60):
                     instruction = 'RIGHT'
-                elif (point - scene_info.platform[0] < 5):
+                elif (scene_info.platform[0] > 90):
                     instruction = 'LEFT'
 
-            if instruction == 'NONE':
-                comm.send_instruction(scene_info.frame, PlatformAction.NONE)
-                #print('NONE')
-            elif instruction == 'LEFT':
+            if instruction == 'LEFT':
                 comm.send_instruction(scene_info.frame, PlatformAction.MOVE_LEFT)
                 #print('LEFT')
             elif instruction == 'RIGHT':
                 comm.send_instruction(scene_info.frame, PlatformAction.MOVE_RIGHT)
                 #print('RIGHT')
+            else:
+                comm.send_instruction(scene_info.frame, PlatformAction.NONE)
+                #print('NONE')
 
